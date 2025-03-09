@@ -6,14 +6,6 @@ import "boxicons/css/boxicons.min.css";
 import Picker from '@emoji-mart/react'
 import data from '@emoji-mart/data'
 
-async function getOpenAIKey() {
-    const response = new Response(import.meta.env.VITE_OPENAI_API_KEY, {
-        headers: { 'Content-Type': 'text/plain' },
-    });
-    console.log("Prajwal reached to the getOpenAPIKey");
-    return response.ok ? await response.text() : null;
-}
-
 const ChatBotApp = ({ onGoBack, chats, setChats, activeChat, setActiveChat, onNewChat }) => {
   const [inputValue, setInputValue] = useState('')
   const [messages, setMessages] = useState([])
@@ -70,39 +62,52 @@ const ChatBotApp = ({ onGoBack, chats, setChats, activeChat, setActiveChat, onNe
       localStorage.setItem('chats', JSON.stringify(updatedChats))
       setIsTyping(true)
 
-      const apiKey = await getOpenAIKey();
-      if (!apiKey) {
-          console.error('API key not found');
-          return;
-      }
+      console.log("Query: ", inputValue)
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
+
+      const username = 'user@northeastern.edu';
+      const password = 'chat_dev@2025';
+      const url = 'http://134.122.24.40:8000/get_gpt';
+      const body = { query: inputValue };
+      
+      // Encoding credentials for Basic Authentication
+      const authHeader = 'Basic ' + btoa(`${username}:${password}`);
+      
+      const response = await fetch(url, {
+        method: 'POST', // Set the HTTP method to POST
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-
+          'Content-Type': 'application/json',  // Set the content type
+          'Authorization': authHeader,         // Add the Basic Auth header
         },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [{ role: 'user', content: inputValue }],
-          max_tokens: 500,
-        }),
+        body: JSON.stringify(body),            // Send the body as a string
       })
+ 
+        console.log("Response: ", response);
+        const data = await response.json();
+        console.log('Parsed Response from API:', data); 
 
-      const data = await response.json()
-      const chatResponse = data.choices[0].message.content.trim()
 
-      const newResponse = {
-        type: 'response',
-        text: chatResponse,
-        timestamp: new Date().toLocaleTimeString(),
-      }
+        let chatResponse = "";
+        if (data.response) {
+          chatResponse = data.response;  // Correct key based on your API response
+        } else if (data.choices && data.choices.length > 0) {
+            chatResponse = data.choices[0].message.content.trim();
+        } else {
+          console.log("API response doesn't contain expected keys.");
+          return; // Stop execution if no valid response
+        }
+        // Create and update chat messages
+        const newResponse = {
+          type: 'response',
+          text: chatResponse,
+          timestamp: new Date().toLocaleTimeString(),
+        };
 
-      const updatedMessagesWithResponse = [...updatedMessages, newResponse]
-      setMessages(updatedMessagesWithResponse)
-      localStorage.setItem(activeChat, JSON.stringify(updatedMessagesWithResponse))
-      setIsTyping(false)
+        const updatedMessagesWithResponse = [...updatedMessages, newResponse]
+        setMessages(updatedMessagesWithResponse)
+        localStorage.setItem(activeChat, JSON.stringify(updatedMessagesWithResponse))
+      
+      // setIsTyping(false)
 
       const updatedChatsWithResponse = chats.map((chat) => {
         if (chat.id === activeChat) {
@@ -112,6 +117,8 @@ const ChatBotApp = ({ onGoBack, chats, setChats, activeChat, setActiveChat, onNe
       })
       setChats(updatedChatsWithResponse)
       localStorage.setItem('chats', JSON.stringify(updatedChatsWithResponse))
+    
+    setIsTyping(false);
     }
   }
 
